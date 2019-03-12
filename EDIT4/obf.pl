@@ -16,21 +16,10 @@
 use strict; 
 use Getopt::Long; 
 my $filename = "";
-my $subrtl_file =""; # $chip in encrypt.pl, use in encrypt and cp to staging
+my $subrtl_file =""; 
 my $arch = "";
 my $tag = "";
 my $branch = "";
-#my $cp_orgrtl_dir = "/data/share/QA/release_kit/HW/".uc($subrtl_file)."/".$tag."/rtl";
-#my $cp_obfrtl_dir = "/data/share/QA/release_kit/HW/".uc($subrtl_file)."/".$tag."_obf/rtl";
-=pot
-my ($tag, $filename, $arch);
-
-GetOptions (
-            'tag|t=s'      => \$tag,
-            'arch|a=s'      => \$arch,
-            'filename|f=s'      => \$filename,
-                        );
-=cut
 my $obf_dir = ""; # or use cdobf
 my $create_dir_1 = "";
 my $create_dir_2 = "";
