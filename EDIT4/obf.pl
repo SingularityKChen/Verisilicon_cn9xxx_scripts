@@ -7,7 +7,7 @@
 #*******IMPORTANT!*******#
 # NEED TO MOVE 
 # ```GetOptions``` 
-# in encrypt.pl 
+# in 
 # from after `my $rams`
 # to before `my $cmd` 
 #to get right $in and $out
