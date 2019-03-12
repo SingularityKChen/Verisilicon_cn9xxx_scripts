@@ -3,7 +3,6 @@
 # Author: SingularityKChen
 # Date: 2019.03.05
 # Edition: V1.0
-# Servise: srv200
 # FOR the VIP chip only because of the env
 use strict; 
 my $filename = "";
