@@ -1,8 +1,11 @@
 #!/usr/bin/perl 
 # Filename: chip_readinfo.pl
 # Author: SingularityKChen
-# Date: 2019.03.08
-# Edition: V1.4
+# Date: 2019.03.12
+# Edition: V2.0
+# New:	Version: V2.0
+#		Add warnings module
+#		Fix the $list_dir
 use strict;
 sub chip_readinfo {
 	my $filename = $_[0];
