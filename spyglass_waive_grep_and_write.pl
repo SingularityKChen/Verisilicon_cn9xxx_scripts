@@ -2,9 +2,14 @@
 # Filename: spyglass_waive_grep_and_write.pl
 # Author: SingularityKChen
 # Date: 2019.04.18
-# Edition: V4.1
+# Edition: V4.2
 #************************#
 #******** NEW ***********#
+#** Version: V4.2
+#** Date: 2019.04.18
+#* *set @match_verilog_filenames and %match_waive_msgs
+#   to null at every new rule loop;
+#
 #** Version: V4.1
 #** Date: 2019.04.18
 #* *Fix the bug that msg is the same but not match
@@ -147,6 +152,8 @@ my ($temp_combination_verilog_msg, @split_combination_verilog_msg, @match_verilo
 WAIVERULE: {
 	foreach my $rule_name (@waive_rulenames){ #read every line of the spyglass report
 		@rulelinesinfoes = grep /$rule_name/, @fileinfo;
+		@match_verilog_filenames = ();
+		%match_waive_msgs = ();
 		VMSGVMSG: {
 			foreach $temp_combination_verilog_msg (@{$match_combination_verilog_msgs{$rule_name}}){
 				@split_combination_verilog_msg = split(/$splitword/,$temp_combination_verilog_msg);
