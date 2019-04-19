@@ -1,10 +1,19 @@
 #!/usr/bin/perl 
 # Filename: spyglass_waive_grep_and_write.pl
 # Author: SingularityKChen
-# Date: 2019.04.18
-# Edition: V4.2
+# Date: 2019.04.19
+# Edition: V4.3
 #************************#
 #******** NEW ***********#
+#** Version: V4.3
+#** Date: 2019.04.19
+#* *Cp the $waive_file at the beginning to $new_waive_file
+#   and add waive into $new_waive_file;
+#* *Add foreach loop to jump the number sign(#) and null lines;
+#* *Use qw(strftime) to add comment into $new_waive_file
+#   at the end of every successful run time;
+#* *Change the default $waive_file;
+#
 #** Version: V4.2
 #** Date: 2019.04.18
 #* *set @match_verilog_filenames and %match_waive_msgs
@@ -36,12 +45,12 @@
 #
 #** Version: V3.5
 #** Date: 2019.04.16
-#* *Fix the bug that ' is supposed not to be translated;
+#* *Fix the bug that single quote(') is supposed not to be translated;
 #
 #** Version: V3.4.6
 #** Date: 2019.04.15
 #* *Fix the bug when the waive file is read in spyglass
-#   "0-9 command no found" by correct the '"' into '{' and '}';
+#   "0-9 command no found" by replace the double quote(") with curly braces( { and } );
 #* *Better the info output;
 #* *Add some comment to make the script more readable;
 #* *translate the expression like 16'h to 16\'h
@@ -85,30 +94,39 @@ use strict;
 #use warnings;
 use Getopt::Long;
 use Switch;
+use POSIX qw(strftime);
 $| = 1;
-my ($filename, $waive_file);
-$filename = "moresimple.rpt"; #the report file
-$waive_file = "spyglass_waive.tcl"; #the tcl file
+my ($rptfile, $waive_file);
+$rptfile = "moresimple.rpt"; #the default report file
+$waive_file = "waive_model.awl"; #the default awl file
 GetOptions (
-            'filename|f=s'    =>\$filename,
+            'rptfile|r=s'    =>\$rptfile,
             'waivefile|w=s'    =>\$waive_file,
             );
-my (%match_combination_verilog_msgs, @waive_rulenames);
-# $combination_verilog_msg: read from $waive_file, the combination of the Verilog file name and waive msg
-# %match_combination_verilog_msgs: read from $waive_file, the keys are $waive_rulename, the values are every $combination_verilog_msg of this rule
-# @waive_rulenames: read from $waive_file, the total rule waited to be waived
-open (WAIVE, "<", "$waive_file")  || die "[*E*R*R*O*R*]\nCan't open $waive_file\n";
-my @waivelinesinfo = <WAIVE>;
-close (WAIVE);
+my $datestring = strftime "%Y_%m_%d_%H_%M", localtime;
+my $new_waive_file = "new_".$datestring."_".$waive_file;
+system("/bin/tcsh -c 'cp $waive_file $new_waive_file'"); #cp the $waive_file
 my $filefolder_name = "matched_rules";
+my (%match_combination_verilog_msgs, @waive_rulenames, @waivelinesinfo);
+# $combination_verilog_msg: read from $new_waive_file, the combination of the Verilog file name and waive msg
+# %match_combination_verilog_msgs: read from $new_waive_file, the keys are $waive_rulename, the values are every $combination_verilog_msg of this rule
+# @waive_rulenames: read from $new_waive_file, the total rule waited to be waived
+# @waivelinesinfo: read from $new_waive_file, concludes all the effective-rows
+open (WAIVE, "<", "$new_waive_file")  || die "[*E*R*R*O*R*]\nCan't open $new_waive_file\n";
+foreach my $temp_waive_line (<WAIVE>) {
+	if ($temp_waive_line !~ /^#|^$/) { #if current line doesn't begin with number sign(#) or be a null line, then it's added into @waivelinesinfo
+		push(@waivelinesinfo, $temp_waive_line);
+	}
+}
+close (WAIVE);
 if (-e $filefolder_name) {
 	print "$filefolder_name exists!\n";
 } elsif (@waivelinesinfo) {
 	mkdir($filefolder_name);
 }
 my $splitword = "splitword"; #used to combinate the Verilog file name and waive msg and translate them.
-my $waivelineinfo; #one line of $waive_file
-foreach $waivelineinfo (@waivelinesinfo){ #read every line of $waive_file
+my $waivelineinfo; #one line of $new_waive_file
+foreach $waivelineinfo (@waivelinesinfo){ #read every line of $new_waive_file
 	if ($waivelineinfo !~ /^$/) { #if not \n
 		chomp($waivelineinfo);
 		my (@waive_line_split, $waive_rulename, $match_verilog_filename, $match_waive_msg);
@@ -133,22 +151,22 @@ foreach $waivelineinfo (@waivelinesinfo){ #read every line of $waive_file
 	}
 }
 print "--------------\n[*I*N*F*O*]\n\@waive_rulenames are @waive_rulenames\n--------------\n";
-open (LINE, "<", "$filename")  || die "[*E*R*R*O*R*] Can't open $filename\n";
+open (LINE, "<", "$rptfile")  || die "[*E*R*R*O*R*] Can't open $rptfile\n";
 my (@rulelinesinfoes, $read_rulename, $verilog_filename, $waive_msg, @fileinfo);
-# @rulelinesinfoes: read from $filename, concludes all the line from $filename which matched by $rule_name
-# $read_rulename: read from $filename-@rulelinesinfoes, the rule name
-# $verilog_filename: read from $filename-@rulelinesinfoes, the Verilog file name
-# $waive_msg: read from $filename-@rulelinesinfoes, the msg
-# @fileinfo: read from $filename, all the message of the $filename
+# @rulelinesinfoes: read from $rptfile, concludes all the line from $rptfile which matched by $rule_name
+# $read_rulename: read from $rptfile-@rulelinesinfoes, the rule name
+# $verilog_filename: read from $rptfile-@rulelinesinfoes, the Verilog file name
+# $waive_msg: read from $rptfile-@rulelinesinfoes, the msg
+# @fileinfo: read from $rptfile, all the message of the $rptfile
 @fileinfo = <LINE>;
 close (LINE);
 my ($temp_combination_verilog_msg, @split_combination_verilog_msg, @match_verilog_filenames, $split_verilog_filename, $split_msg, %match_waive_msgs);
-# $temp_combination_verilog_msg: read from $waive_file, the combination of the Verilog file name and waive msg
-# @split_combination_verilog_msg: read from $waive_file, the splited array of Verilog file name and msg
-# $split_verilog_filename: read from $waive_file, Verilog file name which isn't conclude the ".*"
-# @match_verilog_filenames: read from $waive_file, the array of Verilog filename
-# $split_msg: read from $waive_file, msg
-# %match_waive_msgs: read from $waive_file, keys are Verilog filenames, while the values are the parallel msgs
+# $temp_combination_verilog_msg: read from $new_waive_file, the combination of the Verilog file name and waive msg
+# @split_combination_verilog_msg: read from $new_waive_file, the splited array of Verilog file name and msg
+# $split_verilog_filename: read from $new_waive_file, Verilog file name which isn't conclude the ".*"
+# @match_verilog_filenames: read from $new_waive_file, the array of Verilog filename
+# $split_msg: read from $new_waive_file, msg
+# %match_waive_msgs: read from $new_waive_file, keys are Verilog filenames, while the values are the parallel msgs
 WAIVERULE: {
 	foreach my $rule_name (@waive_rulenames){ #read every line of the spyglass report
 		@rulelinesinfoes = grep /$rule_name/, @fileinfo;
@@ -192,12 +210,12 @@ WAIVERULE: {
 								print ".";
 							} else {
 								print "x";
-								#Now try to add the new waive into the $waive_file because of $waive_msg
+								#Now try to add the new waive into the $new_waive_file because of $waive_msg
 								add_waive_msg($waive_msg, ${$match_waive_msgs{$last_verilog_file_name}}[-1], $read_rulename, $last_verilog_file_name);
 							}
 						} else {
 							print "x";
-							#Now try to add the new waive into the $waive_file because of $last_verilog_file_name
+							#Now try to add the new waive into the $new_waive_file because of $last_verilog_file_name
 							add_waive_msg($waive_msg, ${$match_waive_msgs{$match_verilog_filenames[0]}}[-1], $read_rulename, $last_verilog_file_name);
 						}
 					}
@@ -211,7 +229,11 @@ WAIVERULE: {
 		print "\n--------------\n"
 	}
 }
-print "--------------\n[*I*N*F*O*]\nSuccessfully, you can check the matched list at $filefolder_name\n--------------\n";
+print "--------------\n[*I*N*F*O*]\nSuccessfully, you can check the matched list at $filefolder_name\nAnd you can cp the $new_waive_file into sg_setup\n--------------\n";
+open (WAIVE, ">>", "$new_waive_file")  || die "--------------\n[*E*R*R*O*R*] Can't open $new_waive_file\n";
+my $waive_successful = "################## ABOVE $datestring ABOVE ##################"; # $datestring is the time begin to run this script
+print WAIVE $waive_successful;
+close (WAIVE);
 
 sub add_waive_msg {
 	my $sub_waive_msg = $_[0]; # deliveried from $waive_msg
@@ -282,7 +304,7 @@ sub add_waive_msg {
 		print "+";
 	}
 	if ($_[0] =~ /$msg_print_final/ && $msg_print_final ne "\n") { #if the msg read from the reoprt can be matched by new waive msg
-		open (WAIVE, ">>", "$waive_file")  || die "--------------\n[*E*R*R*O*R*] Can't open $waive_file\n";
+		open (WAIVE, ">>", "$new_waive_file")  || die "--------------\n[*E*R*R*O*R*] Can't open $new_waive_file\n";
 		$sub_waive_print_waive = "waive -rule $sub_read_rulename -file \".*$sub_read_rulename_match\" -msg {$msg_print_final} -regexp\n";
 		print WAIVE $sub_waive_print_waive;
 		close (WAIVE);
@@ -290,7 +312,7 @@ sub add_waive_msg {
 		add_waive_msg_to_array($sub_waive_print_waive);
 		redo JUDGEFILE;
 	} else {
-		print "\n--------------\n[*E*R*R*O*R*] try adjust auto failed!!!!!!!!!!\n--------------\n";
+		print "\n--------------\n[*E*R*R*O*R*] Try adjust auto failed!!!!!!!!!!\nBegan at $datestring\n--------------\n";
 		print "\$msg_print_final is $msg_print_final;\n";
 		print "\$_[0] is $_[0];\n";
 		print "\$sub_waive_msg is $sub_waive_msg;\n";
