@@ -1,15 +1,29 @@
 #!/usr/bin/perl 
 # Filename: spyglass_waive_grep_and_write.pl
 # Author: SingularityKChen
-# Date: 2019.04.19
-# Edition: V4.3
+# Date: 2019.04.22
+# Edition: V4.4
 #************************#
 #******** NEW ***********#
-#** Version: V4.3
+#** Version: V4.4
+#** Date: 2019.04.22
+#* *Delete W240 from the foreach loop jump list;
+#* *Correct the way to splite @msg_print_waive, @msg_print_read 
+#   and $msg_print_final when the rule is W240;
+#* *Add sub function print_detail to print more details
+#   when input option -view|v;
+#
+#** Version: V4.3.1
+#** Date: 2019.04.19
+#* *Add the -h option to print help information;
+#* *Correct the location of every elements in @rule_line_split;
+#
+#** Version: V4.3.1
 #** Date: 2019.04.19
 #* *Cp the $waive_file at the beginning to $new_waive_file
 #   and add waive into $new_waive_file;
-#* *Add foreach loop to jump the number sign(#) and null lines;
+#* *Add foreach loop to jump the number sign(#) and null
+#   lines and rule FlopEConst|NoAssignX-ML|W240|W71;
 #* *Use qw(strftime) to add comment into $new_waive_file
 #   at the end of every successful run time;
 #* *Change the default $waive_file;
@@ -96,13 +110,16 @@ use Getopt::Long;
 use Switch;
 use POSIX qw(strftime);
 $| = 1;
-my ($rptfile, $waive_file);
+my ($rptfile, $waive_file, $needhelp, $view_detail);
 $rptfile = "moresimple.rpt"; #the default report file
 $waive_file = "waive_model.awl"; #the default awl file
 GetOptions (
             'rptfile|r=s'    =>\$rptfile,
             'waivefile|w=s'    =>\$waive_file,
+            'help|h'    =>\$needhelp,
+            'view|v'    =>\$view_detail,
             );
+die `pod2text -w 100 $0` if $needhelp; #if input the option 'h' or 'help', then print the help message
 my $datestring = strftime "%Y_%m_%d_%H_%M", localtime;
 my $new_waive_file = "new_".$datestring."_".$waive_file;
 system("/bin/tcsh -c 'cp $waive_file $new_waive_file'"); #cp the $waive_file
@@ -114,13 +131,13 @@ my (%match_combination_verilog_msgs, @waive_rulenames, @waivelinesinfo);
 # @waivelinesinfo: read from $new_waive_file, concludes all the effective-rows
 open (WAIVE, "<", "$new_waive_file")  || die "[*E*R*R*O*R*]\nCan't open $new_waive_file\n";
 foreach my $temp_waive_line (<WAIVE>) {
-	if ($temp_waive_line !~ /^#|^$/) { #if current line doesn't begin with number sign(#) or be a null line, then it's added into @waivelinesinfo
+	if ($temp_waive_line !~ /^#|^$|FlopEConst|NoAssignX-ML|W71/) { #if current line doesn't begin with number sign(#) or be a null line, then it's added into @waivelinesinfo; if current waive relates to FlopEConst|NoAssignX-ML|W71, then skip.
 		push(@waivelinesinfo, $temp_waive_line);
 	}
 }
 close (WAIVE);
 if (-e $filefolder_name) {
-	print "$filefolder_name exists!\n";
+	#print "$filefolder_name exists!\n";
 } elsif (@waivelinesinfo) {
 	mkdir($filefolder_name);
 }
@@ -186,20 +203,15 @@ WAIVERULE: {
 			}
 		}
 		if (@rulelinesinfoes) { #if @rulelinesinfoes isn't null
-			print "--------------\n[*I*N*F*O*]\n$rule_name is processing\n--------------\n";
+			print_detail( "--------------\n[*I*N*F*O*]\n$rule_name is processing\n--------------\n", "$rule_name is processing...");
 			open (RRULE, ">", "$filefolder_name/$rule_name")  || die "[*E*R*R*O*R*] Can't open $rule_name\n";
 			print RRULE "\t\t| matching list |\n";
 			RULELINE:{
 				foreach my $rulelineinfo (@rulelinesinfoes){ #now determine every line related to this rule in the report
 					my @rule_line_split = split(/\s\s\s+/,$rulelineinfo);#at least three \s,then split it, and we can get seperated information
 					$read_rulename = $rule_line_split[1];
-					if ($rule_line_split[2] eq "Error" or $rule_line_split[2] eq "Warning" or $rule_line_split[2] eq "Info") { #the location of design file name and msg are different in some rules
-						$verilog_filename = $rule_line_split[3];
-						$waive_msg = $rule_line_split[6];
-					} else {
-						$verilog_filename = $rule_line_split[4];
-						$waive_msg = $rule_line_split[7];
-					}
+					$verilog_filename = $rule_line_split[4];
+					$waive_msg = $rule_line_split[7];
 					chomp($waive_msg);
 					my @waive_verilog_file_name = split(/\//,$verilog_filename); #split the read filename include dir, the last one is the real file name
 					my $last_verilog_file_name = $waive_verilog_file_name[-1];
@@ -207,22 +219,22 @@ WAIVERULE: {
 						if (grep {$_ eq $last_verilog_file_name} @match_verilog_filenames) { #if the design file name is matched
 							if (grep {$waive_msg =~ /$_/} @{$match_waive_msgs{$last_verilog_file_name}}) { #if the msg is matched
 								print RRULE "     \t\t$read_rulename\t$rule_line_split[0]\n";
-								print ".";
+								print_detail(".");
 							} else {
-								print "x";
+								print_detail("x");
 								#Now try to add the new waive into the $new_waive_file because of $waive_msg
 								add_waive_msg($waive_msg, ${$match_waive_msgs{$last_verilog_file_name}}[-1], $read_rulename, $last_verilog_file_name);
 							}
 						} else {
-							print "x";
+							print_detail("x");
 							#Now try to add the new waive into the $new_waive_file because of $last_verilog_file_name
 							add_waive_msg($waive_msg, ${$match_waive_msgs{$match_verilog_filenames[0]}}[-1], $read_rulename, $last_verilog_file_name);
 						}
 					}
 				}
 			}
-
 			close (RRULE);
+			print_detail( "\n--------------\n[*I*N*F*O*]\n$rule_name done\n--------------\n" , "done\n");
 		} else {
 			print "--------------\n[*W*A*R*R*I*N*G*]\n$rule_name \@rulelinesinfoes is empty\n--------------\n";
 		}
@@ -231,7 +243,7 @@ WAIVERULE: {
 }
 print "--------------\n[*I*N*F*O*]\nSuccessfully, you can check the matched list at $filefolder_name\nAnd you can cp the $new_waive_file into sg_setup\n--------------\n";
 open (WAIVE, ">>", "$new_waive_file")  || die "--------------\n[*E*R*R*O*R*] Can't open $new_waive_file\n";
-my $waive_successful = "################## ABOVE $datestring ABOVE ##################"; # $datestring is the time begin to run this script
+my $waive_successful = "################## ABOVE $datestring ABOVE ##################\n"; # $datestring is the time begin to run this script
 print WAIVE $waive_successful;
 close (WAIVE);
 
@@ -260,48 +272,52 @@ sub add_waive_msg {
 	#$sub_waive_msg =~ s/(\<)/\\\</g;
 	#$sub_waive_msg =~ s/(\>)/\\\>/g;
 	#$sub_waive_msg =~ s/([0-9]+)\'([bdh])/$1\\\'$2/g; # something like 16'h to 16\'h
-	if (grep /expression: /, $sub_waive_msg) { #for W116, W362
-		@msg_print_waive = split(/\\\"/,$sub_waive_msgs_match);
-		@msg_print_read = split(/\"/,$sub_waive_msg);
-		if (grep /For operator/, $sub_waive_msg) { #if exist operator, then read it and correct and write it into waive.
-			my @msg_print_waive_operator = split(/\(|\)/,$msg_print_waive[0]);
-			my @msg_print_read_operator = split(/\(|\)/,$msg_print_read[0]);
-			$msg_print_waive[0] = "$msg_print_waive_operator[0]\($msg_print_read_operator[1]\)$msg_print_waive_operator[2]";
-			print "*";
-
+	switch($sub_read_rulename){ #to generate new msg
+		case /W116|W362|STARC-2\.10\.3\.2c/ { #for W116, W362
+			@msg_print_waive = split(/\\\"/,$sub_waive_msgs_match);
+			@msg_print_read = split(/\"/,$sub_waive_msg);
+			if (grep /For operator/, $sub_waive_msg) { #if exist operator, then read it and correct and write it into waive.
+				my @msg_print_waive_operator = split(/\(|\)/,$msg_print_waive[0]);
+				my @msg_print_read_operator = split(/\(|\)/,$msg_print_read[0]);
+				$msg_print_waive[0] = "$msg_print_waive_operator[0]\($msg_print_read_operator[1]\)$msg_print_waive_operator[2]";
+				print_detail("/");
+			}
+			$msg_print_final = "$msg_print_waive[0]\\\"$msg_print_read[1]\\\"$msg_print_waive[2]\\\"$msg_print_read[3]\\\"$msg_print_waive[4]";
 		}
-		$msg_print_final = "$msg_print_waive[0]\\\"$msg_print_read[1]\\\"$msg_print_waive[2]\\\"$msg_print_read[3]\\\"$msg_print_waive[4]";
-	}
-	if (grep /LHS: \'.+\'/, $sub_waive_msg) { #W164a, W164b
-		@msg_print_waive = split(/\' width|HS: \'/,$sub_waive_msgs_match);
-		@msg_print_read = split(/\' width|HS: \'/,$sub_waive_msg);
-=pot
-		print "0000$msg_print_read[1]\n";
-		print "$msg_print_read[3]\n";
-		print "$msg_print_waive[2]\n";
-		print "!!!$sub_waive_msgs_match\n";
-		print "$msg_print_waive[0]\n";
-=cut
-		$msg_print_final = "$msg_print_waive[0]HS: \'$msg_print_read[1]\' width$msg_print_waive[2]HS: \'$msg_print_read[3]\' width$msg_print_waive[4]";
-		print "-";
-	}
-	if (grep /Expr: \'.+\'/, $sub_waive_msg) { #W486, W484
-		@msg_print_waive = split(/\\\(Expr: \'|\'\\\)/,$sub_waive_msgs_match);
-		@msg_print_read = split(/\\\(Expr: \'|\'\\\)/,$sub_waive_msg);
-=pot
-		print "\$sub_waive_msg is $sub_waive_msg\n";
-		print "\@msg_print_read 1 and 3\n";
-		print "$msg_print_read[1]\n";
-		print "$msg_print_read[3]\n--------------\n";
-		print "\$sub_waive_msgs_match is $sub_waive_msgs_match\n";
-		print "\$_[1] is $_[1]\n";
-		print "\@msg_print_waive 0 2 and -1\n";
-		print "$msg_print_waive[0]\n";
-		print "$msg_print_waive[2]\n";
-		print "$msg_print_waive[-1]\n";
-=cut
-		$msg_print_final = "$msg_print_waive[0]\\\(Expr: \'$msg_print_read[1]\'\\\)$msg_print_waive[2]\\\(Expr: \'$msg_print_read[3]\'\\\)$msg_print_waive[4]";
-		print "+";
+		case /W164[ab]|STARC-2\.10\.3\.2b/ { #W164a, W164b, STARC-2.10.3.2b
+			@msg_print_waive = split(/\' width|HS: \'/,$sub_waive_msgs_match);
+			@msg_print_read = split(/\' width|HS: \'/,$sub_waive_msg);
+			#print "0000$msg_print_read[1]\n";
+			#print "$msg_print_read[3]\n";
+			#print "$msg_print_waive[2]\n";
+			#print "!!!$sub_waive_msgs_match\n";
+			#print "$msg_print_waive[0]\n";
+			$msg_print_final = "$msg_print_waive[0]HS: \'$msg_print_read[1]\' width$msg_print_waive[2]HS: \'$msg_print_read[3]\' width$msg_print_waive[4]";
+			print_detail("*");
+		}
+		case /W486|W484/ { #W486, W484
+			@msg_print_waive = split(/\\\(Expr: \'|\'\\\)/,$sub_waive_msgs_match);
+			@msg_print_read = split(/\\\(Expr: \'|\'\\\)/,$sub_waive_msg);
+			#print "\$sub_waive_msg is $sub_waive_msg\n";
+			#print "\@msg_print_read 1 and 3\n";
+			#print "$msg_print_read[1]\n";
+			#print "$msg_print_read[3]\n--------------\n";
+			#print "\$sub_waive_msgs_match is $sub_waive_msgs_match\n";
+			#print "\$_[1] is $_[1]\n";
+			#print "\@msg_print_waive 0 2 and -1\n";
+			#print "$msg_print_waive[0]\n";
+			#print "$msg_print_waive[2]\n";
+			#print "$msg_print_waive[-1]\n";
+			$msg_print_final = "$msg_print_waive[0]\\\(Expr: \'$msg_print_read[1]\'\\\)$msg_print_waive[2]\\\(Expr: \'$msg_print_read[3]\'\\\)$msg_print_waive[4]";
+			print_detail("-");
+		}
+		case "W240" {
+			@msg_print_waive = split(/\s\'|\'\s/,$sub_waive_msgs_match);
+			@msg_print_read = split(/\s\'|\'\s/,$sub_waive_msg);
+			$msg_print_final = "$msg_print_waive[0] \'$msg_print_read[1]\' $msg_print_waive[-1]";
+			print_detail("+");
+		}
+		else { } #no need
 	}
 	if ($_[0] =~ /$msg_print_final/ && $msg_print_final ne "\n") { #if the msg read from the reoprt can be matched by new waive msg
 		open (WAIVE, ">>", "$new_waive_file")  || die "--------------\n[*E*R*R*O*R*] Can't open $new_waive_file\n";
@@ -313,6 +329,7 @@ sub add_waive_msg {
 		redo JUDGEFILE;
 	} else {
 		print "\n--------------\n[*E*R*R*O*R*] Try adjust auto failed!!!!!!!!!!\nBegan at $datestring\n--------------\n";
+		print "\$sub_read_rulename is $sub_read_rulename;\n";
 		print "\$msg_print_final is $msg_print_final;\n";
 		print "\$_[0] is $_[0];\n";
 		print "\$sub_waive_msg is $sub_waive_msg;\n";
@@ -337,3 +354,65 @@ sub add_waive_msg_to_array { #upload the new waive into the array
 		push(@match_verilog_filenames, $sub_add_match_verilog_filename);
 	}
 }
+
+sub print_detail {
+	if ($view_detail) {
+		print $_[0];
+	} elsif ($_[1]) {
+		print $_[1];
+	} else {
+		# else...
+	}
+}
+
+=pod
+
+=for text
+
+=over 2
+
+=head1 Description
+
+spyglass_waive_grep_and_write.pl is a script to read the report produced by spyglass, and compared the generated messages with the waivefile.
+
+If one message can not be matched by the regular expressions in the waivefile, then write the parallel waive into the end of waivefile.
+
+If you want to see every detail while processing, you can simply -v or -view. And the infomation printed on the screen, "." means this report message can be waived by spyglass now; "x" means this report message can not be waived right now but this script will try to correct it. "/" "*" "-" or "+" mean this report message is processed by different rules.
+
+=head1 Read In and Write Out
+
+This script read in two files: rptfile (named $rptfile, default:moresimple.rpt) and waivefile (named $waive_file, default:waive_model.awl).
+
+Then it write out a new waivefile (named $new_waive_file) and a direction (named $filefolder_name, default:matched_rules).
+
+The direction concludes some files named by rule names, and those files show the labe of each message in rptfile.
+
+=head1 Usage
+
+for short options:
+
+spyglass_waive_grep_and_write.pl -r <rptfile> -w <waivefile> [-v] [-h]
+
+for long options:
+
+spyglass_waive_grep_and_write.pl -rptfile <rptfile> -waivefile <waivefile> [-view] [-help]
+
+=head1 Options
+
+-rptfile|r  [str]		the default report file(default:moresimple.rpt)
+
+-waivefile|w  [str]		the default awl file(default:waive_model.awl)
+
+-view|v 				print more detail information while processing
+
+-help|h 				print this help information
+
+=head1 Example
+
+spyglass_waive_grep_and_write.pl -r moresimple.rpt -w waive_model.awl
+
+spyglass_waive_grep_and_write.pl -v -r violations.rpt -w waive_model.awl
+
+spyglass_waive_grep_and_write.pl -h
+
+=cut
