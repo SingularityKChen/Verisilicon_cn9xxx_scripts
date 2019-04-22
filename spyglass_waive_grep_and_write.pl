@@ -2,23 +2,24 @@
 # Filename: spyglass_waive_grep_and_write.pl
 # Author: SingularityKChen
 # Date: 2019.04.22
-# Edition: V4.4
+# Edition: V4.4.1
 #************************#
 #******** NEW ***********#
-#** Version: V4.4
+#** Version: V4.4.1
 #** Date: 2019.04.22
 #* *Delete W240 from the foreach loop jump list;
 #* *Correct the way to splite @msg_print_waive, @msg_print_read 
 #   and $msg_print_final when the rule is W240;
 #* *Add sub function print_detail to print more details
 #   when input option -view|v;
+#* *Simplify the way to escape $sub_waive_msg;
 #
 #** Version: V4.3.1
 #** Date: 2019.04.19
 #* *Add the -h option to print help information;
 #* *Correct the location of every elements in @rule_line_split;
 #
-#** Version: V4.3.1
+#** Version: V4.3.0
 #** Date: 2019.04.19
 #* *Cp the $waive_file at the beginning to $new_waive_file
 #   and add waive into $new_waive_file;
@@ -241,7 +242,7 @@ WAIVERULE: {
 		print "\n--------------\n"
 	}
 }
-print "--------------\n[*I*N*F*O*]\nSuccessfully, you can check the matched list at $filefolder_name\nAnd you can cp the $new_waive_file into sg_setup\n--------------\n";
+print "--------------\n[*I*N*F*O*]\nSuccessfully, you can check the matched list at $filefolder_name\nNow you can cp the $new_waive_file into sg_setup\n--------------\n";
 open (WAIVE, ">>", "$new_waive_file")  || die "--------------\n[*E*R*R*O*R*] Can't open $new_waive_file\n";
 my $waive_successful = "################## ABOVE $datestring ABOVE ##################\n"; # $datestring is the time begin to run this script
 print WAIVE $waive_successful;
@@ -255,22 +256,7 @@ sub add_waive_msg {
 	my $sub_read_rulename_match = $_[3]; # deliveried from $last_verilog_file_name
 	my (@msg_print_waive,$msg_print_final, @msg_print_read, $sub_waive_print_waive);
 		#transferred meaning#
-	$sub_waive_msg =~ s/(\()/\\\(/g;
-	$sub_waive_msg =~ s/(\))/\\\)/g;
-	$sub_waive_msg =~ s/(\{)/\\\{/g;
-	$sub_waive_msg =~ s/(\})/\\\}/g;
-	$sub_waive_msg =~ s/(\+)/\\\+/g;
-	$sub_waive_msg =~ s/(\[)/\\\[/g;
-	$sub_waive_msg =~ s/(\])/\\\]/g;
-	$sub_waive_msg =~ s/(\^)/\\\^/g;
-	$sub_waive_msg =~ s/(\*)/\\\*/g;
-	$sub_waive_msg =~ s/(\?)/\\\?/g;
-	$sub_waive_msg =~ s/(\1)/\\\1/g;
-	$sub_waive_msg =~ s/(\$)/\\\$/g;
-	$sub_waive_msg =~ s/(\&)/\\\&/g;
-	$sub_waive_msg =~ s/(\|)/\\\|/g;
-	#$sub_waive_msg =~ s/(\<)/\\\</g;
-	#$sub_waive_msg =~ s/(\>)/\\\>/g;
+	$sub_waive_msg =~ s/([\(\)\{\}\[\]\^\$\&\|\+\*\?\1])/\\$1/g;
 	#$sub_waive_msg =~ s/([0-9]+)\'([bdh])/$1\\\'$2/g; # something like 16'h to 16\'h
 	switch($sub_read_rulename){ #to generate new msg
 		case /W116|W362|STARC-2\.10\.3\.2c/ { #for W116, W362
